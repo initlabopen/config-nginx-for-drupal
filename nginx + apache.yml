@@ -1,0 +1,306 @@
+domain: rastl.ru
+# Setup nginx
+nginx_official_repo: True
+nginx_http_params:
+  - log_format main '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for" $request_time'
+  - sendfile on
+  - access_log /var/log/nginx/access.log
+  - error_log /var/log/nginx/error.log
+  - client_max_body_size 256M
+  - keepalive_timeout 65
+  - gzip on
+  - gzip_proxied any
+  - gzip_types text/plain text/xml application/xml application/x-javascript application/javascript text/javascript text/css text/json
+  - gzip_disable "msie6"
+  - gzip_comp_level 5
+  - add_header X-Content-Options nosniff
+  - add_header X-Micro-Cache $upstream_cache_status
+nginx_sites:
+  000-default:
+    - listen 80 default_server
+    - server_name localhost
+    - root "/var/www/html"
+    - return 444
+  {{ domain }}-ssl-www:
+    - listen 443 ssl
+    - server_name www.{{ domain }}
+    - access_log /var/log/nginx/rastl.ru-access.log main
+    - error_log /var/log/nginx/rastl.ru-error.log
+    - ssl_certificate     /etc/ssl/rastl.crt
+    - ssl_certificate_key /etc/ssl/rastl.key
+    - return 301 $scheme://{ domain }$request_uri
+  {{ domain }}-ssl:
+    - listen 443 ssl
+    - server_name {{ domain }}
+    - ssl_certificate     /etc/ssl/rastl.crt
+    - ssl_certificate_key /etc/ssl/rastl.key
+## Filesystem root of the site and index.
+    - root /home/webmaster/domains/dev.rastl.ru/html
+    - index index.php
+    - access_log /var/log/nginx/dev.rastl.ru-access.log main
+    - error_log /var/log/nginx/dev.rastl.ru-error.log
+    - auth_basic "Restricted"
+    - auth_basic_user_file  auth_basic/dev
+## See the blacklist.conf file at the parent dir: /etc/nginx.
+## Deny access based on the User-Agent header.
+    - if ($bad_bot) {return 444;}
+## Deny access based on the Referer header.
+    - if ($bad_referer) { return 444;  }
+## Protection against illegal HTTP methods. Out of the box only HEAD,
+## GET and POST are allowed.
+    - if ($not_allowed_method) {return 405;}
+    - fastcgi_keep_conn on
+    - location ~* ^.+\.(css|ico|cur|js|jpe?g|gif|htc|ico|png|html|xml|otf|ttf|eot|woff2?|svg|mp3|ogg|mpe?g|avi|zip|gz|bz2?|rar|swf|woff|ogg|mp4|wav|aac|skin)$ {
+      expires max;
+      error_page 404 = @rewrite;}
+    - location ~* /files/styles/ {
+      access_log off;
+      expires max;
+      return 404;}
+    - location = /robots.txt {
+      allow all;}
+    - location ~* ^(?:.+\.(?:htaccess|make|txt|engine|inc|info|install|module|profile|po|pot|sh|.*sql|test|theme|tpl(?:\.php)?|xtmpl)|code-style\.pl|/Entries.*|/Repository|/Root|/Tag|/Template)$ {
+      deny all;
+      access_log off;}
+    - location ~ /\. {
+      deny all;
+      access_log off;
+      log_not_found off;}
+## Advanced Aggregation module CSS support http://drupal.org/project/advagg.
+    - location ^~ /sites/default/files/advagg_css/ {
+      expires max;
+      add_header ETag '';
+      add_header Last-Modified 'Wed, 20 Jan 1988 04:20:42 GMT';
+      add_header Accept-Ranges '';
+      location ~* /sites/default/files/advagg_css/css[_[:alnum:]]+\.css$ {
+        access_log off;
+        try_files $uri @rewrite;} }
+## Advanced Aggregation module JS support. http://drupal.org/project/advagg.
+    - location ^~ /sites/default/files/advagg_js/ {
+      expires max;
+      add_header ETag '';
+      add_header Last-Modified 'Wed, 20 Jan 1988 04:20:42 GMT';
+      add_header Accept-Ranges '';
+      location ~* /sites/default/files/advagg_js/js[_[:alnum:]]+\.js$ {
+        access_log off;
+        try_files $uri @rewrite;}}
+    - location ~ ^/sites/default/files/(.+)\.php$ {
+      return 403;}
+      ## Trying to access private files directly returns a 404.
+    - location ^~ /sites/default/files/private/ {
+      internal;}
+    #- location ~* ^/.well-known/ {allow all;}
+    - location ~ ^/files/(.+)\.php$ {
+      return 403;}
+    - location ~ ^/tmp/(.+)\.php$ {
+      return 403;}
+    - location / {
+      try_files $uri @rewrite;}
+    - location ~ '\.php$|^/update.php|/cron.php' {
+      proxy_pass http://phpapache/index.php?q=$uri;
+      proxy_set_header Connection '';
+      proxy_redirect default;
+      proxy_set_header Host             $host;
+      proxy_set_header X-Forwarded-For        $remote_addr;
+      client_max_body_size 10m;
+      client_body_buffer_size 128k;
+      proxy_send_timeout 90;
+      proxy_connect_timeout 90;
+      proxy_read_timeout 90;
+      proxy_buffer_size 4k;
+      proxy_buffers 16 32k;
+      proxy_busy_buffers_size 64k;
+      proxy_temp_file_write_size 64k;
+      include apps/drupal/microcache_proxy_auth.conf; }
+    - location @rewrite {
+      rewrite ^/(.*)$ /index.php?q=$1 last; }
+    - location /nginx_status {
+      if ($dont_show_nginx_status) {return 403;}
+      stub_status on;
+      access_log off;}
+    - location = /favicon.ico {
+      expires 30d;
+      try_files /favicon.ico @empty;}
+      ## Return an in memory 1x1 transparent GIF.
+    - location @empty {
+      expires 30d;
+      empty_gif;}
+  {{ domain }}-www:
+    - listen 80
+    - server_name www.{ domain }
+    - root /home/webmaster/domains/rastl.ru/html
+    - return 301 $scheme://{ domain }$request_uri
+  {{ domain }}:
+    - listen 80
+    - server_name { domain }
+## Filesystem root of the site and index.
+    - root /home/webmaster/domains/dev.rastl.ru/html
+    - index index.php
+    - access_log /var/log/nginx/dev.rastl.ru-access.log main
+    - error_log /var/log/nginx/dev.rastl.ru-error.log
+    - auth_basic "Restricted"
+    - auth_basic_user_file  auth_basic/dev
+## See the blacklist.conf file at the parent dir: /etc/nginx.
+## Deny access based on the User-Agent header.
+    - if ($bad_bot) {return 444;}
+## Deny access based on the Referer header.
+    - if ($bad_referer) { return 444;  }
+## Protection against illegal HTTP methods. Out of the box only HEAD,
+## GET and POST are allowed.
+    - if ($not_allowed_method) {return 405;}
+    - fastcgi_keep_conn on
+    - location ~* ^.+\.(css|ico|cur|js|jpe?g|gif|htc|ico|png|html|xml|otf|ttf|eot|woff2?|svg|mp3|ogg|mpe?g|avi|zip|gz|bz2?|rar|swf|woff|ogg|mp4|wav|aac|skin)$ {
+      expires max;
+      error_page 404 = @rewrite;}
+    - location ~* /files/styles/ {
+      access_log off;
+      expires max;
+      return 404;}
+    - location = /robots.txt {
+      allow all;}
+    - location ~* ^(?:.+\.(?:htaccess|make|txt|engine|inc|info|install|module|profile|po|pot|sh|.*sql|test|theme|tpl(?:\.php)?|xtmpl)|code-style\.pl|/Entries.*|/Repository|/Root|/Tag|/Template)$ {
+      deny all;
+      access_log off;}
+    - location ~ /\. {
+      deny all;
+      access_log off;
+      log_not_found off;}
+# Advanced Aggregation module CSS support. http://drupal.org/project/advagg.
+    - location ^~ /sites/default/files/advagg_css/ {
+      expires max;
+      add_header ETag '';
+      add_header Last-Modified 'Wed, 20 Jan 1988 04:20:42 GMT';
+      add_header Accept-Ranges '';
+      location ~* /sites/default/files/advagg_css/css[_[:alnum:]]+\.css$ {
+        access_log off;
+        try_files $uri @rewrite;} }
+## Advanced Aggregation module JS support. http://drupal.org/project/advagg.
+    - location ^~ /sites/default/files/advagg_js/ {
+      expires max;
+      add_header ETag '';
+      add_header Last-Modified 'Wed, 20 Jan 1988 04:20:42 GMT';
+      add_header Accept-Ranges '';
+      location ~* /sites/default/files/advagg_js/js[_[:alnum:]]+\.js$ {
+        access_log off;
+        try_files $uri @rewrite;}}
+    - location ~ ^/sites/default/files/(.+)\.php$ {
+      return 403;}
+      ## Trying to access private files directly returns a 404.
+    - location ^~ /sites/default/files/private/ {
+      internal;}
+    #- location ~* ^/.well-known/ {allow all;}
+    - location ~ ^/files/(.+)\.php$ {
+      return 403;}
+    - location ~ ^/tmp/(.+)\.php$ {
+      return 403;}
+    - location / {
+      try_files $uri @rewrite;}
+    - location ~ '\.php$|^/update.php|/cron.php' {
+      proxy_pass http://phpapache/index.php?q=$uri;
+      proxy_set_header Connection '';
+      proxy_redirect default;
+      proxy_set_header Host             $host;
+      proxy_set_header X-Forwarded-For        $remote_addr;
+      client_max_body_size 10m;
+      client_body_buffer_size 128k;
+      proxy_send_timeout 90;
+      proxy_connect_timeout 90;
+      proxy_read_timeout 90;
+      proxy_buffer_size 4k;
+      proxy_buffers 16 32k;
+      proxy_busy_buffers_size 64k;
+      proxy_temp_file_write_size 64k;
+      include apps/drupal/microcache_proxy_auth.conf; }
+    - location @rewrite {
+      rewrite ^/(.*)$ /index.php?q=$1 last; }
+    - location /nginx_status {
+      if ($dont_show_nginx_status) {return 403;}
+      stub_status on;
+      access_log off;}
+    - location = /favicon.ico {
+      expires 30d;
+      try_files /favicon.ico @empty;}
+      ## Return an in memory 1x1 transparent GIF.
+    - location @empty {
+      expires 30d;
+      empty_gif;}
+
+nginx_configs:
+  upstream:
+    - upstream phpapache { server 127.0.0.1:8080; }
+  blacklist:
+## Add here all user agents that are to be blocked.
+    - map $http_user_agent $bad_bot {
+        default 0;
+        ~*^Lynx 0;
+        libwww-perl 1;
+        ~(?i)(httrack|htmlparser|libwww) 1;}
+## Add here all referrers that are to blocked.
+    - map $http_referer $bad_referer {
+        default 0;
+        ~(?i)(adult|babes|click|diamond|forsale|girl|jewelry|love|nudit|organic|poker|porn|poweroversoftware|sex|teen|webcam|zippo|casino|replica) 1;}
+## Add here all hosts that should be spared any referrer checking.
+    - geo $bad_referer {
+        127.0.0.1 0;
+        192.168.1.0/24 0; }
+
+  reverse_proxy:
+    - proxy_set_header X-Real-IP $remote_addr
+    - proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for
+    - proxy_set_header Host $http_host
+## Hide the X-Drupal-Cache header provided by Pressflow.
+    - proxy_hide_header 'X-Drupal-Cache'
+## Hide the Drupal 7 header X-Generator.
+    - proxy_hide_header 'X-Generator'
+
+## Include the map to block HTTP methods.
+  map_block_http_method:
+    - map $request_method $not_allowed_method {
+        default 1;
+        GET 0;
+        HEAD 0;
+        POST 0;}
+
+  map_cache:
+    - map $uri $no_cache_ajax {
+        default 0;
+        /system/ajax 1; }
+    - map $http_cookie $no_cache_cookie {
+        default 0;
+        ~SESS 1; }
+    - map $no_cache_ajax$no_cache_cookie $no_cache {
+        default 1;
+        00 0; }
+## If you're using stock Drupal 6 without no_anon, i.e., there's a
+## session cookie being served even to anonymous users, then uncomment
+## the three lines below and comment the above map directive
+    # - map $http_cookie $no_cache {
+    #      default 0;
+    #      ~DRUPAL_UID 1;}
+    - map $http_cookie $cache_uid {
+        default nil;
+        ~SESS[[:alnum:]]+=(?<session_id>[[:graph:]]+) $session_id;}
+
+## Include the Nginx stub status allowed hosts configuration block.
+  nginx_status_allowed_hosts:
+    - geo $dont_show_nginx_status {
+        default 1;
+        127.0.0.1 0;
+        192.168.1.0/24 0;}
+
+## Microcache zone definition for FastCGI.
+  proxy_microcache_zone:
+## If youre using a Nginx version greater than 1.1.1 then you can
+## tweak the Tweaking of the cache loader parameters.
+## Cf. http://forum.nginx.org/read.php?21,213197,213209#msg-213209 for
+## rationale. If you're using a Nginx version lower than 1.1.1 then
+## comment the line below and use the cache zone configuration below this one.
+    - proxy_cache_path /var/cache/nginx/microcache levels=1:2 keys_zone=microcache:5M max_size=1G loader_threshold=2592000000 loader_sleep=1 loader_files=100000;
+## If you're not using a Nginx version greater or equal to 1.1.1 then
+## comment the above configuration and use this one. No cache loader
+## tweaking.
+    #proxy_cache_path /var/cache/nginx/microcache levels=1:2 keys_zone=microcache:5M max_size=1G;
+
+nginx_auth_basic_files:
+  dev:
+    - webmaster:$apr1$dIgI/qH5$jmjkqnfx11w0if/GCtlTG/
