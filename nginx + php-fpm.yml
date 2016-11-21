@@ -1,4 +1,4 @@
-domain: rastl.ru
+
 # Setup nginx
 nginx_official_repo: True
 nginx_http_params:
@@ -15,31 +15,30 @@ nginx_http_params:
   - gzip_comp_level 5
   - add_header X-Content-Options nosniff
   - add_header X-Micro-Cache $upstream_cache_status
-  - include apps/drupal/map_cache.conf
 nginx_sites:
   000-default:
     - listen 80 default_server
     - server_name localhost
     - root "/var/www/html"
     - return 444
-  {{ domain }}-ssl-www:
+  www.example.com-ssl:
     - listen 443 ssl
-    - server_name www.{{ domain }}
-    - access_log /var/log/nginx/rastl.ru-access.log main
-    - error_log /var/log/nginx/rastl.ru-error.log
-    - ssl_certificate     /etc/ssl/rastl.crt
-    - ssl_certificate_key /etc/ssl/rastl.key
-    - return 301 $scheme://{ domain }$request_uri
-  {{ domain }}-ssl:
+    - server_name www.example.com
+    - access_log /var/log/nginx/example.comaccess.log main
+    - error_log /var/log/nginx/example.com-error.log
+    - ssl_certificate     /etc/ssl/example.com.crt
+    - ssl_certificate_key /etc/ssl/example.com.key
+    - return 301 $scheme://example.com$request_uri
+  example.com-ssl:
     - listen 443 ssl
-    - server_name {{ domain }}
-    - ssl_certificate     /etc/ssl/rastl.crt
-    - ssl_certificate_key /etc/ssl/rastl.key
+    - server_name example.com
+    - ssl_certificate     /etc/ssl/example.com.crt
+    - ssl_certificate_key /etc/ssl/example.com.key
 ## Filesystem root of the site and index.
-    - root /home/webmaster/domains/dev.rastl.ru/html
+    - root /home/webmaster/domains/example.com/html
     - index index.php
-    - access_log /var/log/nginx/dev.rastl.ru-access.log main
-    - error_log /var/log/nginx/dev.rastl.ru-error.log
+    - access_log /var/log/nginx/example.com-access.log main
+    - error_log /var/log/nginx/example.com-error.log
     - auth_basic "Restricted"
     - auth_basic_user_file  auth_basic/dev
 ## See the blacklist.conf file at the parent dir: /etc/nginx.
@@ -100,7 +99,7 @@ nginx_sites:
     - location ~ '\.php$|^/update.php|/cron.php' {
       fastcgi_split_path_info ^(.+?\.php)(|/.*)$;
       include apps/drupal/fastcgi_drupal.conf;
-      fastcgi_pass dev.rastl.ru ;
+      fastcgi_pass phpfpm;
       include apps/drupal/microcache_fcgi_auth.conf; }
     - location @rewrite {rewrite ^/(.*)$ /index.php?q=$1;}
     - location /nginx_status {
@@ -109,25 +108,25 @@ nginx_sites:
       access_log off;}
     - location = /status {
       if ($dont_show_fpm_status) {return 403;}
-      fastcgi_pass dev.rastl.ru;
+      fastcgi_pass phpfpm;
       access_log off;}
     - location = /ping {
       if ($dont_show_fpm_status) {return 403;}
-      fastcgi_pass dev.rastl.ru;
+      fastcgi_pass phpfpm;
       access_log off;}
-  {{ domain }}-www:
+  www.example.com:
     - listen 80
-    - server_name www.{ domain }
-    - root /home/webmaster/domains/rastl.ru/html
-    - return 301 $scheme://{ domain }$request_uri
-  {{ domain }}:
+    - server_name www.example.com
+    - root /home/webmaster/domains/example.com/html
+    - return 301 $scheme://example.com$request_uri
+  example.com:
     - listen 80
-    - server_name { domain }
+    - server_name example.com
 ## Filesystem root of the site and index.
-    - root /home/webmaster/domains/dev.rastl.ru/html
+    - root /home/webmaster/domains/example.com/html
     - index index.php
-    - access_log /var/log/nginx/dev.rastl.ru-access.log main
-    - error_log /var/log/nginx/dev.rastl.ru-error.log
+    - access_log /var/log/nginx/example.com-access.log main
+    - error_log /var/log/nginx/example.com-error.log
     - auth_basic "Restricted"
     - auth_basic_user_file  auth_basic/dev
 ## See the blacklist.conf file at the parent dir: /etc/nginx.
@@ -187,7 +186,7 @@ nginx_sites:
       try_files $uri @rewrite;}
     - location ~ '\.php$|^/update.php|/cron.php' {
       include apps/drupal/fastcgi_drupal.conf;
-      fastcgi_pass dev.rastl.ru ;
+      fastcgi_pass phpfpm;
       include apps/drupal/microcache_fcgi_auth.conf; }
     - location @rewrite {rewrite ^/(.*)$ /index.php?q=$1;}
     - location /nginx_status {
@@ -196,16 +195,16 @@ nginx_sites:
       access_log off;}
     - location = /status {
       if ($dont_show_fpm_status) {return 403;}
-      fastcgi_pass dev.rastl.ru;
+      fastcgi_pass phpfpm;
       access_log off;}
     - location = /ping {
       if ($dont_show_fpm_status) {return 403;}
-      fastcgi_pass dev.rastl.ru;
+      fastcgi_pass phpfpm;
       access_log off;}
 
 nginx_configs:
   upstream:
-    - upstream phpcgi { unix:/var/run/php-fpm-maks-portal.sock; }
+    - upstream phpfpm { unix:/var/run/php-fpm.sock; }
   blacklist:
 ## Add here all user agents that are to be blocked.
     - map $http_user_agent $bad_bot {
@@ -329,4 +328,3 @@ nginx_configs:
 
 nginx_auth_basic_files:
   dev:
-    

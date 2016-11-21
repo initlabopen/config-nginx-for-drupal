@@ -1,4 +1,4 @@
-domain: rastl.ru
+
 # Setup nginx
 nginx_official_repo: True
 nginx_http_params:
@@ -21,24 +21,24 @@ nginx_sites:
     - server_name localhost
     - root "/var/www/html"
     - return 444
-  {{ domain }}-ssl-www:
+  www.example.com-ssl:
     - listen 443 ssl
-    - server_name www.{{ domain }}
-    - access_log /var/log/nginx/rastl.ru-access.log main
-    - error_log /var/log/nginx/rastl.ru-error.log
-    - ssl_certificate     /etc/ssl/rastl.crt
-    - ssl_certificate_key /etc/ssl/rastl.key
-    - return 301 $scheme://{ domain }$request_uri
-  {{ domain }}-ssl:
+    - server_name www.example.com
+    - access_log /var/log/nginx/example.com-access.log main
+    - error_log /var/log/nginx/example.com-error.log
+    - ssl_certificate     /etc/ssl/example.com.crt
+    - ssl_certificate_key /etc/ssl/example.com.key
+    - return 301 $scheme://example.com$request_uri
+  example.com-ssl:
     - listen 443 ssl
-    - server_name {{ domain }}
-    - ssl_certificate     /etc/ssl/rastl.crt
-    - ssl_certificate_key /etc/ssl/rastl.key
+    - server_name example.com
+    - ssl_certificate     /etc/ssl/example.com.crt
+    - ssl_certificate_key /etc/ssl/example.com.key
 ## Filesystem root of the site and index.
-    - root /home/webmaster/domains/dev.rastl.ru/html
+    - root /home/webmaster/domains/example.com/html
     - index index.php
-    - access_log /var/log/nginx/dev.rastl.ru-access.log main
-    - error_log /var/log/nginx/dev.rastl.ru-error.log
+    - access_log /var/log/nginx/example.com-access.log main
+    - error_log /var/log/nginx/example.com-error.log
     - auth_basic "Restricted"
     - auth_basic_user_file  auth_basic/dev
 ## See the blacklist.conf file at the parent dir: /etc/nginx.
@@ -49,7 +49,6 @@ nginx_sites:
 ## Protection against illegal HTTP methods. Out of the box only HEAD,
 ## GET and POST are allowed.
     - if ($not_allowed_method) {return 405;}
-    - fastcgi_keep_conn on
     - location ~* ^.+\.(css|ico|cur|js|jpe?g|gif|htc|ico|png|html|xml|otf|ttf|eot|woff2?|svg|mp3|ogg|mpe?g|avi|zip|gz|bz2?|rar|swf|woff|ogg|mp4|wav|aac|skin)$ {
       expires max;
       error_page 404 = @rewrite;}
@@ -125,19 +124,19 @@ nginx_sites:
     - location @empty {
       expires 30d;
       empty_gif;}
-  {{ domain }}-www:
+  www.example.com:
     - listen 80
-    - server_name www.{ domain }
-    - root /home/webmaster/domains/rastl.ru/html
-    - return 301 $scheme://{ domain }$request_uri
-  {{ domain }}:
+    - server_name www.example.com
+    - root /home/webmaster/domains/example.com/html
+    - return 301 $scheme://example.com$request_uri
+  example.com:
     - listen 80
-    - server_name { domain }
+    - server_name example.com
 ## Filesystem root of the site and index.
-    - root /home/webmaster/domains/dev.rastl.ru/html
+    - root /home/webmaster/domains/example.com/html
     - index index.php
-    - access_log /var/log/nginx/dev.rastl.ru-access.log main
-    - error_log /var/log/nginx/dev.rastl.ru-error.log
+    - access_log /var/log/nginx/example.com-access.log main
+    - error_log /var/log/nginx/example.com-error.log
     - auth_basic "Restricted"
     - auth_basic_user_file  auth_basic/dev
 ## See the blacklist.conf file at the parent dir: /etc/nginx.
